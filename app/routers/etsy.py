@@ -416,51 +416,31 @@ async def find_etsy_shop(
 
 @router.get(
     "/my-shop",
-    summary="Get your Etsy shop data (Personal Access)",
-    description="Fetch YOUR shop data using just the API key. No OAuth needed for Personal Access apps.",
+    summary="Get your Etsy shop data",
+    description="Fetch YOUR shop data using just the API key.",
 )
-async def get_my_etsy_shop(
-    shop_name: str = Query("felixadeus", description="Your Etsy shop name"),
-):
-    """Get your shop using API key only - works for Personal Access apps."""
+async def get_my_etsy_shop():
+    """Get your shop using API key only."""
     client = EtsyAPIClient()
     try:
-        shops = await client.find_shops(shop_name)
-        if not shops:
-            return {"status": "error", "message": f"Shop '{shop_name}' not found"}
-
-        my_shop = shops[0]
-        shop_id = my_shop.get("shop_id")
+        shop_id = 53428517
+        shop = await client.get_shop(shop_id)
         listings = await client.get_listings(shop_id, limit=100)
-
-        try:
-            orders = await client.get_shop_receipts(shop_id, limit=100)
-        except:
-            orders = []
-
-        total_revenue = sum(float(r.get("grandtotal", {}).get("amount", 0)) for r in orders if r.get("grandtotal"))
-        total_orders = len(orders)
 
         return {
             "status": "ok",
             "shop": {
                 "shop_id": shop_id,
-                "shop_name": my_shop.get("shop_name"),
-                "title": my_shop.get("title"),
-                "url": my_shop.get("url"),
-                "listing_active_count": my_shop.get("listing_active_count", 0),
-                "num_favorers": my_shop.get("num_favorers", 0),
+                "shop_name": shop.get("shop_name"),
+                "title": shop.get("title"),
+                "url": shop.get("url"),
+                "listing_active_count": shop.get("listing_active_count", 0),
+                "num_favorers": shop.get("num_favorers", 0),
             },
             "listings": {
                 "count": len(listings),
                 "active": len([l for l in listings if l.get("state") == "active"]),
-                "items": [{"id": l.get("listing_id"), "title": l.get("title"), "price": l.get("price"), "state": l.get("state")} for l in listings[:10]],
             },
-            "orders": {
-                "count": total_orders,
-                "total_revenue": round(total_revenue, 2),
-            },
-            "mode": "Personal Access - API key only, no OAuth",
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
